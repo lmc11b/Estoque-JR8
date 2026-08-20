@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>📦 Painel de Estoque</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#fff; --border:#e2e8f0; --text:#111827; --muted:#64748b;
+    --ink:#111827; --accent:#2563eb; --accent-bg:#e8f0fe;
+    --red:#dc2626; --red-bg:#fdeaea; --green:#059669; --green-bg:#e6f5ef; --gold:#d97706; --gold-bg:#fdf3e3;
+    --shadow:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text)}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 16px}
+  header{background:linear-gradient(135deg,var(--ink),#1f2937);color:#fff;padding:22px 0;border-bottom:3px solid var(--accent)}
+  .header-inner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px}
+  header h1{font-size:1.35rem;font-weight:800}
+  header p{font-size:.82rem;opacity:.75;margin-top:2px}
+  .header-actions{display:flex;gap:8px;align-items:center}
+  .brand-logos{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .brand-logo{width:44px;height:44px;border-radius:50%;background:#fff;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.25);overflow:hidden;padding:4px;transition:transform .15s}
+  .brand-logo:hover{transform:scale(1.08)}
+  .brand-logo img{width:100%;height:100%;object-fit:contain;border-radius:6px}
+  .brand-dot{width:100%;height:100%;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:800;color:#fff}
+  .btn{background:var(--accent);border:none;color:#fff;padding:9px 16px;border-radius:10px;font-weight:600;cursor:pointer;font-size:.85rem;box-shadow:0 2px 6px rgba(37,99,235,.35)}
+  .btn:hover{filter:brightness(1.1)}
+  .btn.ghost{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4)}
+  #loadStatus{font-size:.75rem;opacity:.85;text-align:center;margin-top:6px}
+  .filters{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin:16px 0;box-shadow:var(--shadow);display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .search{flex:1;min-width:200px;position:relative}
+  .search input{width:100%;padding:10px 12px 10px 36px;border:1px solid var(--border);border-radius:10px;font-size:.9rem}
+  .search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+  .search span{position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.5}
+  .segmented{display:flex;background:#f8fafc;border:1px solid var(--border);border-radius:10px;overflow:hidden;flex-wrap:wrap}
+  .segmented button{padding:9px 13px;border:none;background:transparent;font-weight:600;font-size:.8rem;cursor:pointer;color:var(--muted);white-space:nowrap}
+  .segmented button.active{background:var(--accent);color:#fff}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{padding:7px 12px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:.78rem;font-weight:600;cursor:pointer}
+  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .overall{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px}
+  .stat{text-align:center;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+  .stat .num{font-size:1.4rem;font-weight:800;line-height:1.1}
+  .stat .lbl{font-size:.72rem;color:var(--muted);margin-top:4px}
+  h2.section{font-size:1rem;font-weight:700;margin:18px 0 10px;color:var(--ink)}
+  .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;align-content:start}
+  .cat-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--shadow);border-left:5px solid var(--accent);cursor:pointer;transition:.15s}
+  .cat-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.1)}
+  .cat-card.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent);background:var(--accent-bg)}
+  .cat-card .nome{font-weight:700;font-size:.9rem;color:var(--ink)}
+  .cat-card .total{font-size:1.7rem;font-weight:800;margin:8px 0 2px;color:var(--accent)}
+  .cat-card .sub{font-size:.73rem;color:var(--muted);margin-bottom:10px}
+  .cat-badges{display:flex;flex-wrap:wrap;gap:6px}
+  .b{padding:4px 9px;border-radius:8px;font-size:.7rem;font-weight:700}
+  .cat-expanded{grid-column:1/-1;background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+  .empty-cats{padding:30px;text-align:center;color:var(--muted)}
+  .table-card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:.86rem}
+  thead th{background:#f8fafc;text-align:left;padding:12px 14px;font-size:.7rem;text-transform:uppercase;white-space:nowrap;letter-spacing:.04em;font-weight:700;border-bottom:1px solid var(--border)}
+  tbody td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tbody tr.item-row{cursor:pointer}
+  tbody tr.item-row:hover{background:#f8fafc}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;font-size:.7rem;font-weight:700;white-space:nowrap;margin:1px}
+  .pill.zerado{background:var(--red-bg);color:var(--red)}
+  .pill.ok{background:var(--green-bg);color:var(--green)}
+  .pill.chegando{background:var(--accent-bg);color:var(--accent)}
+  .pill.mix{background:var(--gold-bg);color:var(--gold)}
+  .item-name{font-weight:600;font-size:.85rem;color:var(--ink)}
+  .item-code{font-size:.7rem;color:var(--muted);font-family:ui-monospace,monospace}
+  .brand-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:.62rem;font-weight:700}
+  .estoque-num{font-size:1.02rem;font-weight:800}
+  .cell-muted{color:var(--muted)}
+  td.active-col{background:var(--accent-bg)}
+  .incoming{display:flex;flex-direction:column;gap:5px}
+  .inc-chip{font-size:.72rem;font-weight:600;background:var(--accent-bg);color:var(--accent);padding:5px 9px;border-radius:8px;white-space:nowrap;line-height:1.35}
+  tr.detail-row td{background:#fafbfd;padding:16px 20px}
+  .detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+  .detail-grid .d{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .detail-grid .d .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:700;margin-bottom:4px}
+  .detail-grid .d .v{font-size:.9rem;font-weight:700;line-height:1.5}
+  .detail-grid .d .v .line{font-weight:500;font-size:.78rem;color:var(--text)}
+  footer{margin:24px 0 40px;text-align:center;font-size:.75rem;color:var(--muted)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media(max-width:640px){.col-jr8,.col-pers{display:none}header h1{font-size:1.15rem}.brand-logo{width:38px;height:38px}}
+</style></head>
+<body>
+
+<header>
+<div class="wrap header-inner">
+  <div><h1>📦 Painel de Estoque</h1><p>Estoque atual · produção · importação</p></div>
+  <div class="brand-logos" id="brandLogos"></div>
+  <div class="header-actions">
+    <button class="btn ghost" onclick="carregarDados()">🔄 Atualizar</button>
+    <button class="btn" onclick="document.getElementById('fileInput').click()">📥 Importar Excel</button>
+  </div>
+  <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this)">
+</div>
+<div class="wrap"><div id="loadStatus">Carregando dados…</div></div>
+</header>
+
+<div class="wrap">
+<div class="filters">
+  <div class="search"><span>🔍</span><input type="text" id="search" placeholder="Buscar item ou código..." oninput="state.search=this.value;render()"/></div>
+  <div class="segmented" id="viewSeg">
+    <button data-view="total" class="active">Total</button>
+    <button data-view="jr8">JR8</button>
+    <button data-view="personale">Personalle SP</button>
+  </div>
+  <div class="segmented" id="brandSeg"></div>
+  <div class="chips" id="statusChips">
+    <button class="chip active" data-status="todos">Todos</button>
+    <button class="chip" data-status="zerado">🔴 Zerado</button>
+    <button class="chip" data-status="ok">🟢 OK</button>
+    <button class="chip" data-status="chegando">🔵 Chegando</button>
+    <button class="chip" data-status="mix">⭐ Mix Qualificado</button>
+  </div>
+</div>
+
+<div class="overall" id="overall"></div>
+
+<div id="searchSection" style="display:none">
+  <h2 class="section">🔍 Resultados da busca <span id="searchCount" style="font-weight:500;font-size:.75rem;color:var(--muted)"></span></h2>
+  <div class="table-card"><div class="table-wrap"><table>
+    <thead><tr><th>Status</th><th>Item</th><th>Estoque Atual</th><th class="col-jr8">JR8</th><th class="col-pers">Personalle SP</th><th>Produção / Importação</th></tr></thead>
+    <tbody id="searchBody"></tbody>
+  </table></div></div>
+</div>
+
+<h2 class="section">📊 Agrupamentos <span style="font-weight:500;font-size:.75rem;color:var(--muted)">(clique para abrir)</span></h2>
+<div class="cat-grid" id="catGrid"></div>
+
+<footer>Dados via Google Sheets · Status: Zerado / OK / Chegando / ⭐ Mix Qualificado</footer>
+</div>
+
+<script>
+/* ============ CONFIGURAÇÃO ============ */
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS4XwVP8WUlGixVHcgq6Pu2DSC210M0BD13lTCm6pNtaEeOFfvYtVarqSgxRgEUwQ/pub?output=csv';
+
+const LED_MIXED_HEADERS = ['LED FAROL', 'SUPER LED COB BLAZE', 'SUPER LED M7'];
+const LED_PREFIX_GROUPS = [
+  {prefix:'LCB',   group:'SUPER LED COB BLAZE'},
+  {prefix:'JH0M7', group:'SUPER LED M7'},
+  {prefix:'JH0R8', group:'LED FAROL / R8'}
+];
+
+const BRAND_COLORS = {
+  'M7':        {color:'#2563eb', bg:'#e8f0fe'},
+  'JR8':       {color:'#dc2626', bg:'#fdeaea'},
+  'NAKAMICHI': {color:'#111827', bg:'#e5e9f2'}
+};
+const LOGO_BASE = {'M7':'m7','JR8':'jr8','NAKAMICHI':'nakamichi'};
+const LOGO_EXTS = ['jpg','jpeg','png','webp','svg'];
+
+/* ============ UTILITÁRIOS ============ */
+let uidCounter = 0;
+let DATA = [];
+const state = {view:'total', brand:'todos', search:'', status:'todos', selectedGroup:null};
+
+const today = (()=>{ const d=new Date(); d.setHours(0,0,0,0); return d; })();
+const norm = s => (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+const fmt = v => Number(v).toLocaleString('pt-BR');
+
+function num(v){
+  if(v===null||v===undefined||v==='') return 0;
+  if(typeof v==='number') return isFinite(v)?v:0;
+  const s=String(v).trim();
+  if(!s) return 0;
+  if(/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) return parseFloat(s.replace(/\./g,'').replace(',','.'))||0;
+  if(/^\d+,\d+$/.test(s)) return parseFloat(s.replace(',','.'))||0;
+  const n=Number(s);
+  return isFinite(n)?n:0;
+}
+
+function parseDate(v){
+  if(v===null||v===undefined||v===''||v===0) return null;
+  if(typeof v==='number') return new Date(Math.round((v-25569)*86400*1000));
+  const s=String(v).trim();
+  if(!s || s==='00/00/0000' || s==='00/00/00' || s==='00/00') return null;
+  if(/^\d{5}(\.\d+)?$/.test(s)){ const n=Number(s); if(n>20000&&n<60000) return new Date(Math.round((n-25569)*86400*1000)); }
+  const parts=s.split(/[\/\-.]/).map(x=>x.trim()).filter(Boolean);
+  if(parts.length<2) return null;
+  let a=+parts[0], b=+parts[1], c=parts.length>=3?+parts[2]:null;
+  if(isNaN(a)||isNaN(b)||a===0||b===0) return null;
+  let day=a, month=b, year=c;
+  if(year!==null && a>31 && year<=31){ day=year; year=a; month=b; }
+  if(year===null||year===0||isNaN(year)) year=new Date().getFullYear();
+  if(year<100) year = year<70?2000+year:1900+year;
+  const d=new Date(year, month-1, day);
+  return (d.getFullYear()===year && d.getMonth()===month-1 && d.getDate()===day) ? d : null;
+}
+function fmtDate(d){ if(!d||isNaN(d.getTime())) return ''; return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); }
+
+function splitVals(v){ if(v===null||v===undefined||v==='') return []; return String(v).split(/[\s\n\r]+/).map(s=>s.trim()).filter(Boolean); }
+function parseIncoming(qCell, dCell){
+  const q=splitVals(qCell), d=splitVals(dCell), out=[];
+  const len=Math.max(q.length, d.length);
+  for(let i=0;i<len;i++){
+    const qty = q[i]!==undefined ? num(q[i]) : 0;
+    const dt  = d[i]!==undefined ? parseDate(d[i]) : null;
+    if(qty>0) out.push({qty:qty, date:dt});
+  }
+  return out;
+}
+
+function hasIncoming(it){ return [it.aereo,it.maritimo,it.producao].some(a=>a&&a.length); }
+function isMix(it){ return ['sim','s','yes','y','true','1','x'].includes(String(it.mix||'').trim().toLowerCase()); }
+function getStock(it,v){
+  if(v==='jr8') return num(it.jr8);
+  if(v==='personale') return num(it.personale);
+  if(it.total!==undefined&&it.total!==null&&it.total!=='') return num(it.total);
+  return num(it.jr8)+num(it.personale);
+}
+
+/* ============ STATUS ============ */
+function getStatuses(it){
+  const s=[];
+  if(getStock(it,state.view)<=0) s.push('zerado'); else s.push('ok');
+  if(hasIncoming(it)) s.push('chegando');
+  if(isMix(it)) s.push('mix');
+  return s;
+}
+const STATUS_META = {
+  zerado:{label:'Zerado',cls:'zerado'},
+  ok:{label:'OK',cls:'ok'},
+  chegando:{label:'Chegando',cls:'chegando'},
+  mix:{label:'⭐ Mix Qualificado',cls:'mix'}
+};
+function pills(it){ return getStatuses(it).map(s=>`<span class="pill ${STATUS_META[s].cls}">${STATUS_META[s].label}</span>`).join(''); }
+
+/* ============ MARCAS ============ */
+function brandStyle(b){ const k=(b||'').trim().toUpperCase(); return BRAND_COLORS[k]||{color:'#64748b',bg:'#f1f5f9'}; }
+function brandTag(b){ if(!b) return ''; const st=brandStyle(b); return `<span class="brand-tag" style="color:${st.color};background:${st.bg}">${b}</span>`; }
+function getBrands(){ const s=new Set(); DATA.forEach(g=>g.items.forEach(it=>{ const b=(it.marca||'').trim(); if(b) s.add(b); })); return [...s].sort(); }
+function matchesBrand(it){ return state.brand==='todos' || norm(it.marca)===norm(state.brand); }
+
+/* ============ FILTROS ============ */
+function matchesStatus(it){ return state.status==='todos' || getStatuses(it).includes(state.status); }
+function matchesSearch(it){ if(!state.search) return true; return norm(it.item).includes(norm(state.search)) || norm(it.codigo).includes(norm(state.search)); }
+function overallItems(){ const out=[]; DATA.forEach(g=>g.items.forEach(it=>{ if(matchesBrand(it)&&matchesStatus(it)) out.push(it); })); return out; }
+function visibleItems(g){ return g.items.filter(it=>matchesBrand(it)&&matchesStatus(it)&&matchesSearch(it)); }
+
+/* ============ RENDER: TOTAIS ============ */
+function renderOverall(){
+  let count=0,total=0,zerado=0,ok=0,chegando=0,mix=0;
+  overallItems().forEach(it=>{
+    count++; total+=getStock(it,state.view);
+    const s=getStatuses(it);
+    if(s.includes('zerado'))zerado++;
+    if(s.includes('ok'))ok++;
+    if(s.includes('chegando'))chegando++;
+    if(s.includes('mix'))mix++;
+  });
+  document.getElementById('overall').innerHTML=`
+  <div class="stat"><div class="num" style="color:var(--ink)">${count}</div><div class="lbl">Itens no filtro</div></div>
+  <div class="stat"><div class="num" style="color:var(--accent)">${fmt(total)}</div><div class="lbl">Estoque total</div></div>
+  <div class="stat"><div class="num" style="color:var(--red)">${zerado}</div><div class="lbl">Zerado</div></div>
+  <div class="stat"><div class="num" style="color:var(--green)">${ok}</div><div class="lbl">OK</div></div>
+  <div class="stat"><div class="num" style="color:var(--accent)">${chegando}</div><div class="lbl">Chegando</div></div>
+  <div class="stat"><div class="num" style="color:var(--gold)">${mix}</div><div class="lbl">Mix Qualificado</div></div>`;
+}
+
+/* ============ RENDER: BUSCA ============ */
+function renderSearch(){
+  const sec=document.getElementById('searchSection');
+  if(!state.search){ sec.style.display='none'; return; }
+  const results=[];
+  DATA.forEach(g=>g.items.forEach(it=>{ if(matchesBrand(it)&&matchesStatus(it)&&matchesSearch(it)) results.push(it); }));
+  sec.style.display='block';
+  document.getElementById('searchCount').textContent=`(${results.length} item${results.length!==1?'s':''})`;
+  document.getElementById('searchBody').innerHTML = results.length ? itemRowsHTML(results,'s') : `<tr><td colspan="6" style="padding:30px;text-align:center;color:var(--muted)">Nenhum item encontrado.</td></tr>`;
+}
+
+/* ============ RENDER: CARDS ============ */
+function groupStats(items){
+  let total=0,zerado=0,ok=0,chegando=0,mix=0;
+  items.forEach(it=>{ total+=getStock(it,state.view); const s=getStatuses(it);
+    if(s.includes('zerado'))zerado++; if(s.includes('ok'))ok++;
+    if(s.includes('chegando'))chegando++; if(s.includes('mix'))mix++; });
+  return {t:total,zerado,ok,chegando,mix};
+}
+function renderCats(){
+  const el=document.getElementById('catGrid');
+  let html='';
+  DATA.forEach((g,gi)=>{
+    const items=visibleItems(g);
+    if(!items.length) return;
+    const s=groupStats(items);
+    html+=`<div class="cat-card ${state.selectedGroup===g.nome?'selected':''}" onclick="toggleGroup('${gi}')">
+      <div class="nome">📦 ${g.nome}</div>
+      <div class="total">${fmt(s.t)}</div>
+      <div class="sub">${items.length} item${items.length!==1?'s':''}</div>
+      <div class="cat-badges">
+        <span class="b" style="background:var(--red-bg);color:var(--red)">🔴 ${s.zerado} zerado</span>
+        <span class="b" style="background:var(--green-bg);color:var(--green)">🟢 ${s.ok} ok</span>
+        <span class="b" style="background:var(--accent-bg);color:var(--accent)">🔵 ${s.chegando} chegando</span>
+        <span class="b" style="background:var(--gold-bg);color:var(--gold)">⭐ ${s.mix} mix</span>
+      </div></div>`;
+    if(state.selectedGroup===g.nome){
+      html+=`<div class="cat-expanded"><div class="table-wrap"><table>
+        <thead><tr><th>Status</th><th>Item</th><th>Estoque Atual</th><th class="col-jr8">JR8</th><th class="col-pers">Personalle SP</th><th>Produção / Importação</th></tr></thead>
+        <tbody>${itemRowsHTML(items,'g'+gi)}</tbody>
+      </table></div></div>`;
+    }
+  });
+  el.innerHTML=html||`<div class="empty-cats">Nenhum agrupamento com os filtros selecionados.</div>`;
+}
+function toggleGroup(gi){
+  const g=DATA[gi]; if(!g) return;
+  state.selectedGroup = state.selectedGroup===g.nome ? null : g.nome;
+  renderCats();
+}
+
+/* ============ RENDER: LINHAS ============ */
+function chipIncoming(arr, icon, label){
+  const valid=(arr||[]).filter(p=>p && p.qty>0);
+  if(!valid.length) return '';
+  const total=valid.reduce((s,p)=>s+p.qty,0);
+  const proximas=valid.filter(p=>p.date && p.date>=today).sort((a,b)=>a.date-b.date);
+  const nxt=proximas.length?proximas[0].date:null;
+  const atrasado=valid.some(p=>p.date && p.date<today);
+  let txt=`${icon} ${label} ${fmt(total)}`;
+  if(nxt) txt+=` · próx ${fmtDate(nxt)}`;
+  if(atrasado) txt+=' ⚠️';
+  if(valid.length>1) txt+=` (${valid.length} pedidos)`;
+  return `<span class="inc-chip">${txt}</span>`;
+}
+function incomingHTML(it){
+  const parts=[
+    chipIncoming(it.aereo,'✈️','Aéreo'),
+    chipIncoming(it.maritimo,'🚢','Marítimo'),
+    chipIncoming(it.producao,'🏭','Produção')
+  ].filter(Boolean);
+  return parts.length ? `<div class="incoming">${parts.join('')}</div>` : '<span class="cell-muted">—</span>';
+}
+function listHTML(arr){
+  const valid=(arr||[]).filter(p=>p && p.qty>0);
+  if(!valid.length) return '—';
+  return valid.map(p=>{
+    const late=p.date && p.date<today;
+    const cor=late?'color:var(--red)':'';
+    return `<div class="line" style="${cor}">${fmt(p.qty)} un. → ${p.date?fmtDate(p.date):'sem data'}${late?' (atrasado)':''}</div>`;
+  }).join('');
+}
+function itemRowsHTML(items,prefix){
+  return items.map(it=>{
+    const key=prefix+'-'+it._uid;
+    return `<tr class="item-row" data-key="${key}" onclick="toggleDetail('${key}')">
+      <td>${pills(it)}</td>
+      <td><div class="item-name">${it.item}</div><div class="item-code">${it.codigo||'—'}${brandTag(it.marca)}</div></td>
+      <td class="${state.view==='total'?'active-col':''}"><div class="estoque-num">${fmt(getStock(it,state.view))}</div></td>
+      <td class="col-jr8 ${state.view==='jr8'?'active-col':''}">${fmt(num(it.jr8))}</td>
+      <td class="col-pers ${state.view==='personale'?'active-col':''}">${fmt(num(it.personale))}</td>
+      <td>${incomingHTML(it)}</td></tr>
+      <tr class="detail-row" id="detail-${key}" style="display:none">
+        <td colspan="6"><div class="detail-grid">
+          <div class="d"><div class="k">Estoque JR8</div><div class="v">${fmt(num(it.jr8))}</div></div>
+          <div class="d"><div class="k">Estoque Personalle SP</div><div class="v">${fmt(num(it.personale))}</div></div>
+          <div class="d"><div class="k">✈️ Importação Aéreo</div><div class="v">${listHTML(it.aereo)}</div></div>
+          <div class="d"><div class="k">🚢 Importação Marítimo</div><div class="v">${listHTML(it.maritimo)}</div></div>
+          <div class="d"><div class="k">🏭 Em Produção</div><div class="v">${listHTML(it.producao)}</div></div>
+        </div></td></tr>`;
+  }).join('');
+}
+function toggleDetail(k){ const el=document.getElementById('detail-'+k); if(el) el.style.display = el.style.display==='none' ? 'table-row' : 'none'; }
+
+/* ============ LOGOS ============ */
+function logoCandidates(brand){
+  const key=(brand||'').trim().toUpperCase();
+  const base=LOGO_BASE[key];
+  if(!base) return [];
+  const names=[base,(brand||'').trim()];
+  const out=[];
+  LOGO_EXTS.forEach(ext=>names.forEach(n=>{ if(n) out.push(n+'.'+ext); }));
+  return [...new Set(out)];
+}
+function logoHTML(b,st){
+  const srcs=logoCandidates(b);
+  if(!srcs.length) return `<span class="brand-dot" style="background:${st.color}">${(b[0]||'?').toUpperCase()}</span>`;
+  return `<img src="${srcs[0]}" alt="${b}" data-srcs='${JSON.stringify(srcs)}' data-brand="${b}" data-color="${st.color}" onerror="logoNext(this)">`;
+}
+function logoNext(img){
+  const srcs=JSON.parse(img.dataset.srcs||'[]');
+  const idx=srcs.indexOf(img.getAttribute('src'))+1;
+  if(idx<srcs.length){ img.setAttribute('src',srcs[idx]); return; }
+  const dot=document.createElement('span');
+  dot.className='brand-dot';
+  dot.style.background=img.dataset.color||'#64748b';
+  dot.textContent=(img.dataset.brand||'?')[0].toUpperCase();
+  img.replaceWith(dot);
+}
+
+function renderBrands(){
+  const brands=getBrands();
+  document.getElementById('brandSeg').innerHTML =
+    `<button data-brand="todos" class="${state.brand==='todos'?'active':''}">Todas</button>` +
+    brands.map(b=>`<button data-brand="${b}" class="${state.brand===b?'active':''}">${b}</button>`).join('');
+  document.getElementById('brandLogos').innerHTML = brands.map(b=>{
+    const st=brandStyle(b);
+    return `<div class="brand-logo" title="${b}" style="box-shadow:0 2px 8px ${st.color}40">${logoHTML(b,st)}</div>`;
+  }).join('');
+}
+function render(){ renderOverall(); renderSearch(); renderCats(); }
+
+/* ============ MAPEAMENTO DE COLUNAS ============ */
+function buildMap(headers){
+  const hs = headers.map(h=>({raw:h, n:norm(h)}));
+  const findFirst = test => { const f=hs.find(x=>test(x.n)); return f?f.raw:null; };
+  const findAny = (words, exclude=[]) => findFirst(n => {
+    if(exclude.some(e=>n.includes(e))) return false;
+    return words.some(w=>n.includes(w));
+  });
+
+  const jr8       = findAny(['jr8','jr 8']);
+  const personale = findAny(['personalle','personale','personal']);
+  const total     = findFirst(n => (n.includes('estoque')||n==='estoque') && !n.includes('jr') && !n.includes('personal'));
+  const item      = findAny(['item','nome','produto','descricao','produtos']);
+  const codigo    = findAny(['codigo','código','cod','sku','ref']);
+  const marca     = findAny(['marca','brand']);
+  const mix       = findAny(['mix']);
+
+  const aereo        = findAny(['aereo','aéreo'], ['previsao','previsão','data','chegada']);
+  const prevAereo    = findFirst(n => (n.includes('aereo')||n.includes('aéreo')) && (n.includes('previsao')||n.includes('previsão')||n.includes('data')||n.includes('chegada')));
+
+  const maritimo     = findAny(['maritimo','marítimo'], ['previsao','previsão','data','chegada']);
+  const prevMaritimo = findFirst(n => (n.includes('maritimo')||n.includes('marítimo')) && (n.includes('previsao')||n.includes('previsão')||n.includes('data')||n.includes('chegada')));
+
+  const producao     = findAny(['producao','produção'], ['previsao','previsão','chegada','data','brasil']);
+  const prevBrasil   = findFirst(n => n.includes('brasil') && (n.includes('previsao')||n.includes('previsão')||n.includes('chegada')||n.includes('data')));
+  const prevProducao = findFirst(n => (n.includes('producao')||n.includes('produção')) && (n.includes('previsao')||n.includes('previsão')||n.includes('chegada')||n.includes('data')));
+
+  return {
+    item, codigo, marca, mix, jr8, personale, total,
+    aereo, prevAereo, maritimo, prevMaritimo,
+    producao, prevBrasil: prevBrasil || prevProducao
+  };
+}
+
+/* ============ PROCESSAR LINHAS ============ */
+function processRows(rows, headers){
+  const map=buildMap(headers);
+  const grupos=[]; let cur=null;
+  rows.forEach(r=>{
+    const nome=r[map.item], cod=r[map.codigo];
+    const isHeader = !cod || String(cod).trim()==='';
+    if(isHeader){ cur={nome:(nome||'Geral').toString().trim(), items:[]}; grupos.push(cur); return; }
+    if(!cur){ cur={nome:'Geral', items:[]}; grupos.push(cur); }
+    cur.items.push({
+      item:nome, codigo:String(cod).trim(),
+      marca:r[map.marca], mix:r[map.mix],
+      jr8:r[map.jr8], personale:r[map.personale], total:r[map.total],
+      aereo:parseIncoming(r[map.aereo], r[map.prevAereo]),
+      maritimo:parseIncoming(r[map.maritimo], r[map.prevMaritimo]),
+      producao:parseIncoming(r[map.producao], r[map.prevBrasil])
+    });
+  });
+  const finais=[];
+  grupos.forEach(g=>{
+    const isMixed=LED_MIXED_HEADERS.some(h=>norm(h)===norm(g.nome));
+    if(!isMixed){ if(g.items.length) finais.push(g); return; }
+    const mapG={};
+    g.items.forEach(it=>{
+      const rule=LED_PREFIX_GROUPS.find(r=>it.codigo.toUpperCase().startsWith(r.prefix));
+      const key=rule?rule.group:g.nome;
+      if(!mapG[key]) mapG[key]=[];
+      mapG[key].push(it);
+    });
+    Object.keys(mapG).forEach(k=>finais.push({nome:k, items:mapG[k]}));
+  });
+  return finais;
+}
+
+/* ============ CACHE ============ */
+const CACHE_KEY='estoque_cache_v1', CACHE_TS='estoque_cache_ts_v1';
+function salvarCache(data){ try{ localStorage.setItem(CACHE_KEY,JSON.stringify(data)); localStorage.setItem(CACHE_TS,String(Date.now())); }catch(e){ console.warn('Sem espaço no cache',e); } }
+function lerCache(){ try{ const d=localStorage.getItem(CACHE_KEY); const t=Number(localStorage.getItem(CACHE_TS)||0); if(!d) return null; return {data:JSON.parse(d), ts:t}; }catch(e){ return null; } }
+function fmtTempo(ms){ if(ms<1000) return Math.round(ms)+'ms'; return (ms/1000).toFixed(1)+'s'; }
+
+/* ============ CARREGAR DADOS ============ */
+async function carregarDados(){
+  const status=document.getElementById('loadStatus');
+  const grid=document.getElementById('catGrid');
+  const t0=performance.now();
+  status.innerHTML='⏳ Carregando planilha...';
+  grid.innerHTML=`<div class="empty-cats"><div style="display:inline-block;width:32px;height:32px;border:3px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite"></div><div style="margin-top:12px">Buscando dados da planilha…</div></div>`;
+  let err={message:''};
+  try{
+    const res=await fetch(SHEET_URL,{cache:'no-store'});
+    if(!res.ok) throw new Error('Erro HTTP '+res.status);
+    const csv=await res.text();
+    if(csv.trim().startsWith('<')) throw new Error('Resposta HTML (verifique publicação)');
+    const parsed=Papa.parse(csv,{header:true, skipEmptyLines:true});
+    if(!parsed.data.length) throw new Error('Planilha vazia');
+    const headers=parsed.meta.fields||Object.keys(parsed.data[0]);
+    DATA=processRows(parsed.data, headers);
+    assignUids();
+    state.selectedGroup=null;
+    salvarCache(DATA);
+    const t1=performance.now();
+    const total=DATA.reduce((s,g)=>s+g.items.length,0);
+    status.innerHTML=`✅ ${DATA.length} agrupamentos · ${total} itens · carregado em ${fmtTempo(t1-t0)}`;
+    renderBrands(); render(); return;
+  }catch(e){ err=e; console.warn('Erro ao carregar planilha:', e.message); }
+
+  const c=lerCache();
+  if(c && c.data.length){
+    DATA=c.data;
+    assignUids();
+    const total=DATA.reduce((s,g)=>s+g.items.length,0);
+    const agem=Math.round((Date.now()-c.ts)/60000);
+    status.innerHTML=`⚠️ Carregado do cache (${agem}min atrás) · ${DATA.length} agrp. · ${total} itens`;
+    renderBrands(); render(); return;
+  }
+  status.innerHTML=`❌ Erro ao carregar: ${err.message}`;
+  grid.innerHTML=`<div class="empty-cats"><b>Não foi possível carregar os dados</b><br><small>${err.message}</small></div>`;
+}
+
+/* ============ IMPORTAÇÃO EXCEL ============ */
+function handleFile(input){
+  const arquivo=input.files[0]; if(!arquivo) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:null,raw:true});
+      if(!rows.length){ alert('Planilha vazia'); return; }
+      const headers=Object.keys(rows[0]);
+      DATA=processRows(rows, headers);
+      assignUids();
+      state.selectedGroup=null;
+      renderBrands(); render();
+      document.getElementById('loadStatus').innerHTML='✅ Importado via Excel: '+DATA.length+' agrupamentos.';
+    }catch(e){ alert('Erro: '+e.message); }
+  };
+  reader.readAsArrayBuffer(arquivo);
+  input.value='';
+}
+
+/* ============ EVENTOS ============ */
+document.getElementById('viewSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  state.view=b.dataset.view;
+  document.querySelectorAll('#viewSeg button').forEach(x=>x.classList.toggle('active',x===b));
+  render();
+});
+document.getElementById('brandSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  state.brand=b.dataset.brand;
+  renderBrands(); render();
+});
+document.getElementById('statusChips').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  state.status=b.dataset.status;
+  document.querySelectorAll('#statusChips button').forEach(x=>x.classList.toggle('active',x===b));
+  render();
+});
+
+/* ============ INIT ============ */
+function assignUids(){ DATA.forEach(g=>g.items.forEach(it=>{ it._uid=uidCounter++; })); }
+renderBrands();
+carregarDados();
+</script>
+</body></html>
